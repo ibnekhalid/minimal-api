@@ -1,6 +1,7 @@
 ﻿using Application.Company.Commands;
 using Application.Company.Commands.ViewModel;
 using Application.Company.Queries;
+using Common.MinimalValidator;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
@@ -10,14 +11,18 @@ using Tm.Api.Models;
 
 namespace Tm.Api.Endpoints;
 
-public static partial class ApiEndpoints
+internal static class AccountEndpoints
 {
-    public static IEndpointRouteBuilder MapAccountRoutes(this IEndpointRouteBuilder builder)
+    internal const string ACCOUNT_GROUP = "Account";
+    internal static IEndpointRouteBuilder MapAccountRoutes(this IEndpointRouteBuilder builder)
     {
 
 
-        builder.MapPost("/accounts/login", async (IConfiguration configuration, SignInManager<Core.Model.User> signInManager, UserManager<Core.Model.User> userManager, LoginModel loginModel) =>
+        builder.MapPost("/accounts/login", async (IConfiguration configuration, SignInManager<Core.Model.User> signInManager, UserManager<Core.Model.User> userManager, IMinimalValidator minimalValidator, LoginModel loginModel) =>
         {
+            var validationResult = minimalValidator.Validate(loginModel);
+
+            if (!validationResult.IsValid) validationResult.ThorwInvalidArgumentsException();
 
             var loginResult = await signInManager.PasswordSignInAsync(loginModel.Username, loginModel.Password, isPersistent: false, lockoutOnFailure: false);
 
@@ -31,8 +36,10 @@ public static partial class ApiEndpoints
         });
 
         builder.MapPost("/accounts/register", async (IConfiguration configuration, ICompanyCommandService companyCommand,
-            ICompanyQueryService companyQuery, SignInManager<Core.Model.User> signInManager, UserManager<Core.Model.User> userManager, RegisterModel registerModel) =>
+            ICompanyQueryService companyQuery, SignInManager<Core.Model.User> signInManager, UserManager<Core.Model.User> userManager, IMinimalValidator minimalValidator, RegisterModel registerModel) =>
         {
+            var validationResult = minimalValidator.Validate(registerModel);
+            if (!validationResult.IsValid) validationResult.ThorwInvalidArgumentsException();
 
             var companyId = await companyCommand.Create(new CreateCompanyVm { Name = registerModel.CompanyName });
             var company = await companyQuery.Get(companyId);
@@ -49,17 +56,16 @@ public static partial class ApiEndpoints
 
         });
 
-
-
         builder.MapPost("/accounts/refresh-token", async (IConfiguration configuration, ClaimsPrincipal claims, UserManager<Core.Model.User> userManager) =>
         {
             var user = await userManager.FindByNameAsync(
-                           claims.Identity.Name ??
-                           claims.Claims.Where(c => c.Properties.ContainsKey("unique_name")).Select(c => c.Value).FirstOrDefault()
+                           claims?.Identity?.Name ??
+                           claims?.Claims?.Where(c => c.Properties.ContainsKey("unique_name")).Select(c => c.Value).FirstOrDefault()
                            );
             return GetToken(user, configuration);
 
         });
+         //   .WithGroupName(ACCOUNT_GROUP);
         return builder;
     }
     private static string GetToken(Core.Model.User user, IConfiguration configuration)

@@ -1,4 +1,5 @@
 using Common.Environment;
+using Common.MinimalValidator;
 using Core.Model;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -83,6 +84,8 @@ builder.Services.AddSwaggerGen(options =>
     options.SwaggerDoc("v1", new() { Title = "TM API", Version = "v1" });
 });
 #endregion
+
+builder.Services.AddScoped<IMinimalValidator, MinimalValidator>();
 #endregion
 
 var app = builder.Build();
