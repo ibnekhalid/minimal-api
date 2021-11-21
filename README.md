@@ -1,1 +1,1 @@
-#.net 6 - Minimal API
+# .net 6 - Minimal API
