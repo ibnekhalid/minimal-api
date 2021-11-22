@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.Linq;
+using System.Reflection;
 
 namespace Common.MinimalValidator;
 public class MinimalValidator : IMinimalValidator
@@ -19,24 +20,39 @@ public class MinimalValidator : IMinimalValidator
                 var validationAttribute = attribute as ValidationAttribute;
                 if (validationAttribute != null)
                 {
-                    var propertyValue = property.CanRead ? property.GetValue(model) : null;
-                    var isValid = validationAttribute.IsValid(propertyValue);
-
-                    if (!isValid)
+                    if (attribute is CompareAttribute cmValidationAttribute)
                     {
-                        if (result.Errors.ContainsKey(property.Name))
+                        PropertyInfo compareProperty = model.GetType().GetProperty(cmValidationAttribute.OtherProperty);
+
+                        if (compareProperty != null && (string)property.GetValue(model) != (string)compareProperty.GetValue(model))
                         {
-                            var errors = result.Errors[property.Name].ToList();
-                            errors.Add(validationAttribute.FormatErrorMessage(property.Name));
-                            result.Errors[property.Name] = errors.ToArray();
-                        }
-                        else
-                        {
-                            result.Errors.Add(property.Name, new string[] { validationAttribute.FormatErrorMessage(property.Name) });
+                            result.Errors.Add(property.Name, new string[] { cmValidationAttribute.FormatErrorMessage(property.Name) });
+                            result.IsValid = false;
                         }
 
-                        result.IsValid = false;
                     }
+                    else
+                    {
+                        var propertyValue = property.CanRead ? property.GetValue(model) : null;
+                        var isValid = validationAttribute.IsValid(propertyValue);
+
+                        if (!isValid)
+                        {
+                            if (result.Errors.ContainsKey(property.Name))
+                            {
+                                var errors = result.Errors[property.Name].ToList();
+                                errors.Add(validationAttribute.FormatErrorMessage(property.Name));
+                                result.Errors[property.Name] = errors.ToArray();
+                            }
+                            else
+                            {
+                                result.Errors.Add(property.Name, new string[] { validationAttribute.FormatErrorMessage(property.Name) });
+                            }
+
+                            result.IsValid = false;
+                        }
+                    }
+                   
                 }
             }
         }
